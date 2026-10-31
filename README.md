@@ -1,1 +1,1 @@
-# Postman-collection
+# restful-booker-api-tests
