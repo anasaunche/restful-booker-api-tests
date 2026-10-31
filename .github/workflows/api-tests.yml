@@ -1,0 +1,41 @@
+name: API tests
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 12 * * 1"   # every Monday, catches regressions in the live API
+  workflow_dispatch:
+
+jobs:
+  newman:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g newman newman-reporter-htmlextra
+
+      # Gate: functional + security folders must pass
+      - name: Regression suite (must pass)
+        run: >
+          newman run restful-booker.postman_collection.json
+          -e restful-booker.postman_environment.json
+          --folder "00 Health" --folder "01 Auth" --folder "02 Booking lifecycle" --folder "03 Security & error handling"
+          -r cli,htmlextra --reporter-htmlextra-export reports/regression.html
+
+      # Known-defect tracking: failures here are expected and do not break the build
+      - name: Known defects (tracked, non-blocking)
+        if: always()
+        continue-on-error: true
+        run: >
+          newman run restful-booker.postman_collection.json
+          -e restful-booker.postman_environment.json
+          -r cli,htmlextra --reporter-htmlextra-export reports/full-run.html
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: newman-reports
+          path: reports/
